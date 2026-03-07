@@ -1,4 +1,12 @@
 # WebWatcher - 智能网页监控技能
+![OpenClaw](https://img.shields.io/badge/OpenClaw-Skill-blue)
+![Node.js](https://img.shields.io/badge/Node.js-14+-green)
+![License](https://img.shields.io/badge/License-MIT-yellow)
+![Version](https://img.shields.io/badge/Version-1.0.0-orange)
+![Status](https://img.shields.io/badge/Status-Production-success)
+
+[![GitHub stars](https://img.shields.io/github/stars/plum-zhang/openclaw-webwatcher?style=social)](https://github.com/plum-zhang/openclaw-webwatcher/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/plum-zhang/openclaw-webwatcher?style=social)](https://github.com/plum-zhang/openclaw-webwatcher/network/members)
 
 > OpenClaw 技能展示项目 - 自动监控网页变化，智能提取关键信息
 
