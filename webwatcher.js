@@ -196,20 +196,19 @@ async function fetchPage(url, useBrowser = false) {
         await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
       }
 
-      // 用 CDP 导航，完全控制超时
-      const client = await page.createCDPSession();
-      await client.send('Page.enable');
-      await client.send('Page.navigate', { url });
+      // 用 puppeteer 原生方式导航，更稳定
+      try {
+        await page.goto(url, { 
+          waitUntil: 'domcontentloaded', 
+          timeout: 15000 
+        });
+        console.log('✅ 页面已加载');
+      } catch (navError) {
+        console.log(`⚠️ 页面加载超时: ${navError.message}`);
+        // 继续执行，因为页面可能部分加载
+      }
 
-      // 等待页面加载或超时
-      await Promise.race([
-        new Promise(resolve => client.once('Page.loadEventFired', resolve)),
-        new Promise(resolve => setTimeout(resolve, 8000))
-      ]);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      console.log('✅ 页面已加载');
-
-      // 针对京东，额外等待价格元素
+      // 针对京东和 Steam，额外等待价格元素
       if (url.includes('jd.com')) {
         try {
           await page.waitForSelector('.p-price, [class*="price"]', { timeout: 8000 });
@@ -218,18 +217,20 @@ async function fetchPage(url, useBrowser = false) {
           console.log('⚠️ 等待价格元素超时');
         }
       }
+      
+      // 针对 Steam，等待价格元素加载
+      if (url.includes('steampowered.com')) {
+        try {
+          await page.waitForSelector('.game_purchase_price, .discount_final_price', { timeout: 8000 });
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        } catch (e) {
+          console.log('⚠️ 等待 Steam 价格元素超时');
+        }
+      }
 
-      // 用 Runtime.evaluate 取页面内容（比 DOM.getOuterHTML 更快）
-      const result = await Promise.race([
-        client.send('Runtime.evaluate', {
-          expression: 'document.documentElement.outerHTML',
-          returnByValue: true,
-          timeout: 5000
-        }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Runtime.evaluate 超时')), 6000))
-      ]);
-      await client.detach();
-      const html = result.result.value;
+      // 获取页面 HTML
+      const html = await page.content();
+      
       // 注意：不关闭浏览器，保持连接
       return { html, page, browser: null }; // browser 设为 null 避免被关闭
     } catch (error) {
@@ -481,7 +482,8 @@ async function checkPage(url, options = {}) {
   console.log(`🔍 检查页面: ${url}`);
 
   // 价格监控用已有浏览器（需要登录状态），内容监控用 headless 浏览器
-  const useConnectedBrowser = options.type === 'price' || options.browser === 'true';
+  // Steam 页面不需要登录，使用 headless 模式即可
+  const useConnectedBrowser = (options.type === 'price' && !url.includes('steampowered.com')) || options.browser === 'true';
   const { html, page, browser } = await fetchPage(url, useConnectedBrowser);
   const taskId = crypto.createHash('md5').update(url).digest('hex').substring(0, 8);
 
@@ -491,7 +493,7 @@ async function checkPage(url, options = {}) {
     if (options.type === 'price') {
       const price = await extractPrice(html, url, page);
       result = { price };
-      console.log(`💰 当前价格: ${price || '未找到'}`);
+      console.log(`💰 当前价格: ${price !== null ? (price === 0 ? '免费 (0)' : price) : '未找到'}`);
     } else if (options.selector) {
       const content = extractContent(html, options.selector);
       result = { content };
